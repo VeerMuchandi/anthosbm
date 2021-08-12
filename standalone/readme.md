@@ -14,6 +14,7 @@ We will set up and Anthos Standalone cluster with Ubuntu server as the OS. While
 * Download kickstart script for the workstation 
 
 ```
+wget https://raw.githubusercontent.com/VeerMuchandi/anthosbm/main/standalone/ubuntu.cfg
 ```
 
 Change the username and password in this file to values of your choice from the current values in this line
