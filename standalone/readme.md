@@ -1,6 +1,6 @@
 # Standalone Cluster
 
-We will set up and Anthos Standalone cluster with Ubuntu server as the OS. While we create 
+We will set up and Anthos Standalone cluster with Ubuntu server as the OS. The cluster will be installed on virtual machines created using KVM on a single host machine.
 
 ## Prerequisites
 
@@ -103,7 +103,7 @@ sudo apt install snapd
 
 * Install gcloud
 ```
-snap install google-cloud-sdk --classic
+sudo snap install google-cloud-sdk --classic
 ```
 
 
@@ -304,6 +304,10 @@ Credentials saved to file: [/home/ubuntu/.config/gcloud/application_default_cred
 ...
 ```
 
+```
+export GOOGLE_APPLICATION_CREDENTIALS=<<keyfilepath>>
+```
+
 * Create a standalone config file. Substitute the cluster name.
 
 ```
@@ -312,16 +316,43 @@ Credentials saved to file: [/home/ubuntu/.config/gcloud/application_default_cred
 ```
 Note the location of the config file in the output
 
-* Edit the config file for the following parameters
+Edit the config file for the following parameters
 
 * `sshPrivateKeyPath:` - Fill in the path of ssh key from the workstation
 * `type: standalone`
 * `profile: edge`
 * `controlPlane.nodePoolSpec.nodes` set the value of `address` to the ip address of master VM
-* make sure `clusterNetwork.pods.cidrBlocks` range does not overlap the VM Ip address range. If it is, change this CIDR block. 
+* Make sure `clusterNetwork.pods.cidrBlocks` range does not overlap the VM Ip address range. If it is, change this CIDR block. Example change to a range such as `10.0.0.0/16`. Also make sure serviceCIDRBlock doesn't conflict. 
+* Change `loadBalancer.vips.controlPlaneVIP` and `loadBalancer.vips.ingressVIP` values to have unused IP address in the same range as those assigned to masters and node vms
+* Set the value of `loadBalancer.addressPools.addresses` to include `ingressVIP` selected above. 
+* Change `nodeConfig.containerRuntime` to `containerd`
+* Set the values for `NodePool`. `spec.nodes.address` values as worker node IP addresses
+
+* Start cluster installation. Substitute STANDALONE_CLUSTER_NAME
+
+```
+./bmctl create cluster -c STANDALONE_CLUSTER_NAME
+```
+If you have a conflict with the default range `192.168.122.0/24` for `bootstrap-cluster-pod-cidr`, then pass a parameter like shown below
+
+```
+./bmctl create cluster -c STANDALONE_CLUSTER_NAME --bootstrap-cluster-pod-cidr=192.168.123.0/24
+```
+Installation will take a while.
 
 
+## Verify
 
+* Install `kubectl`
+```
+sudo snap install kubectl --classic
+```
+
+* Check the nodes with kubeconfig provided in the cluster creation output
+
+```
+kubectl --kubeconfig KUBECONFIG_PATH get nodes
+```
 
 *** Work in progress **
 
