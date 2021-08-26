@@ -216,6 +216,9 @@ ssh-copy-id <SUBSTITUTE USERNAME>>@<<NODE_IPADDRESS>>
 ssh <SUBSTITUTE USERNAME>>@<<NODE_IPADDRESS>>
 ```
 
+* Upgrade the machine if a new release is available with `do-release-upgrade` and follow the prompts to complete.
+
+
 * **Passwordless Root Login:** Verify if you can `sudo bash` as root without password. If you cannot, then change the permissions in the `/etc/ssh/sshd_config` and restart `sshd` service as root user.
 
 ```
@@ -276,11 +279,23 @@ sudo sed -i "s/^PermitRootLogin.*$/PermitRootLogin without-password/g" /etc/ssh/
 systemctl restart sshd
 ```
 
+* Change the hostname
+Change the hostname in the `/etc/hostname ` and `/etc/hosts` to appropriate value such as `master`, or `worker?`. The hostnames need to be unique for the installer to succeed.
+
+* Upgrade the node
+
 ```
-exit
+do-release-upgrade
+```
+Follow the prompts and answer them.
+
+```
+reboot
 ```
 
 * Repeat the above steps for all the Node VMs
+
+
 
 ## Install Cluster
 
@@ -328,7 +343,7 @@ Edit the config file for the following parameters
 * Change `nodeConfig.containerRuntime` to `containerd`
 * Set the values for `NodePool`. `spec.nodes.address` values as worker node IP addresses
 
-* Start cluster installation. Substitute STANDALONE_CLUSTER_NAME
+Start cluster installation. Substitute STANDALONE_CLUSTER_NAME
 
 ```
 ./bmctl create cluster -c STANDALONE_CLUSTER_NAME
@@ -354,7 +369,90 @@ sudo snap install kubectl --classic
 kubectl --kubeconfig KUBECONFIG_PATH get nodes
 ```
 
-*** Work in progress **
+## Set up Anthos Connectivity
+
+
+Connecting using google cloud credentials via Connect gateway as explained [here](https://cloud.google.com/anthos/multicluster-management/gateway/setup) 
+```
+PROJECT_ID=$(gcloud config get-value project) 
+
+gcloud services enable --project=${PROJECT_ID}  \
+connectgateway.googleapis.com \
+anthos.googleapis.com \
+gkeconnect.googleapis.com \
+gkehub.googleapis.com \
+cloudresourcemanager.googleapis.com
+```
+
+```
+gcloud container hub memberships list
+```
+
+```
+MEMBER=user:veermuchandi@google.com
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+--member ${MEMBER} \
+--role roles/gkehub.gatewayAdmin
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+--member ${MEMBER} \
+--role roles/gkehub.viewer
+```
+
+```
+export KUBECONFIG=/home/ubuntu/bmctl-workspace/standalone1/standalone1-kubeconfig
+
+USER_ACCOUNT=veermuchandi@google.com
+cat <<EOF > /tmp/impersonate.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gateway-impersonate
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - ${USER_ACCOUNT}
+  resources:
+  - users
+  verbs:
+  - impersonate
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gateway-impersonate
+roleRef:
+  kind: ClusterRole
+  name: gateway-impersonate
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: connect-agent-sa
+  namespace: gke-connect
+EOF
+
+kubectl apply -f /tmp/impersonate.yaml
+```
+
+```
+cat <<EOF > /tmp/admin-permission.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gateway-cluster-admin
+subjects:
+- kind: User
+  name: ${USER_ACCOUNT}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+EOF
+# Apply permission policy to the cluster.
+kubectl apply -f /tmp/admin-permission.yaml
+```
+
+Should see green check mark under status in the console after this.
 
 
 
