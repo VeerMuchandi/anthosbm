@@ -1,6 +1,6 @@
 # Standalone Cluster
 
-We will set up and Anthos Standalone cluster with Ubuntu server as the OS. The cluster will be installed on virtual machines created using KVM on a single host machine.
+We will set up and Anthos Standalone cluster with Ubuntu server as the OS. This example shows a cluster installation on virtual machines created using KVM on a single host machine.While this example shows one master and 2 worker nodes, but the configuration can be changed as per the need. 
 
 ## Prerequisites
 
@@ -369,10 +369,13 @@ sudo snap install kubectl --classic
 kubectl --kubeconfig KUBECONFIG_PATH get nodes
 ```
 
-## Set up Anthos Connectivity
-
+## Set up connectivity using Connect GateWay
 
 Connecting using google cloud credentials via Connect gateway as explained [here](https://cloud.google.com/anthos/multicluster-management/gateway/setup) 
+
+
+* Enable APIs
+
 ```
 PROJECT_ID=$(gcloud config get-value project) 
 
@@ -384,12 +387,16 @@ gkehub.googleapis.com \
 cloudresourcemanager.googleapis.com
 ```
 
+* Find the clusters registered with Anthos to make sure that the cluster created above appears in the list. 
+
 ```
 gcloud container hub memberships list
 ```
 
+* Grant IAM roles `gkehub.gatewayAdmin` and `gkehub.viewer` to the user, substituting your user in place of `foo@example.com` below.
+
 ```
-MEMBER=user:veermuchandi@google.com
+MEMBER=user:foo@example.com
 gcloud projects add-iam-policy-binding ${PROJECT_ID} \
 --member ${MEMBER} \
 --role roles/gkehub.gatewayAdmin
@@ -398,10 +405,17 @@ gcloud projects add-iam-policy-binding ${PROJECT_ID} \
 --role roles/gkehub.viewer
 ```
 
+* Set the kubecontext. If already set, you are fine.
+
 ```
 export KUBECONFIG=/home/ubuntu/bmctl-workspace/standalone1/standalone1-kubeconfig
+```
 
-USER_ACCOUNT=veermuchandi@google.com
+* Configure RBAC policies for the user account. Change the `foo@example.com` to your user account. We are assigning `gateway-impersonate` role to the user account. 
+
+```
+USER_ACCOUNT=foo@example.com
+
 cat <<EOF > /tmp/impersonate.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -433,6 +447,8 @@ EOF
 
 kubectl apply -f /tmp/impersonate.yaml
 ```
+
+* Create **permissions policy** for the user on the cluster depending on the access needs. In this case, we are providing `cluster-admin` access to the user account.
 
 ```
 cat <<EOF > /tmp/admin-permission.yaml
